@@ -12,7 +12,7 @@ Note: If your not using live credential follow the [step no 2](https://developer
 [whatsapp\_chat](https://frappecloud.com/marketplace/apps/whatsapp_chat) along with this app to send and receive message like a messenger Installation Steps
 
 ### Step 1) One time to get app 
-`bench get-app https://github.com/shridarpatil/frappe_whatsapp` 
+`bench get-app https://github.com/rahmanizum/frappe_whatsapp` 
 ### Step 2) to install app on any instance/site
 `bench --site [sitename] install-app frappe_whatsapp` 
 
