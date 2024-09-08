@@ -13,7 +13,9 @@
   "phone_id",
   "business_id",
   "app_id",
-  "webhook_verify_token"
+  "webhook_verify_token",
+  "gemini_api_key",
+  "openai_api_key"
  ],
  "fields": [
   {
@@ -57,12 +59,22 @@
    "fieldname": "app_id",
    "fieldtype": "Data",
    "label": "App ID"
+  },
+  {
+   "fieldname": "gemini_api_key",
+   "fieldtype": "Password",
+   "label": "Gemini API KEY"
+  },
+  {
+   "fieldname": "openai_api_key",
+   "fieldtype": "Password",
+   "label": "Openai API KEY"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-05-03 12:42:25.851544",
+ "modified": "2024-09-09 00:10:59.615776",
  "modified_by": "Administrator",
  "module": "Frappe Whatsapp",
  "name": "WhatsApp Settings",

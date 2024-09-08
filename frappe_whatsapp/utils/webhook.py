@@ -5,6 +5,9 @@ import requests
 import time
 from werkzeug.wrappers import Response
 import frappe.utils
+from openai import OpenAI
+import google.generativeai as genai
+import os
 
 
 @frappe.whitelist(allow_guest=True)
@@ -58,6 +61,7 @@ def post():
 					"is_reply": is_reply,
 					"content_type":message_type
 				}).insert(ignore_permissions=True)
+				reply_message(message['from'], message['text']['body'])
 			elif message_type == 'reaction':
 				frappe.get_doc({
 					"doctype": "WhatsApp Message",
@@ -177,3 +181,118 @@ def update_message_status(data):
 	if conversation:
 		doc.conversation_id = conversation
 	doc.save(ignore_permissions=True)
+
+def reply_message(phone_number, message):
+	ai_response = get_response_from_gemini(phone_number, message)
+	frappe.get_doc({
+					"doctype": "WhatsApp Message",
+					"label":"ChatBot",
+					"type": "Outgoing",
+					"to":phone_number,
+					"message":ai_response,
+					"message_type":"Manual",
+					"content_type":"text"
+				}).insert(ignore_permissions=True)
+
+def get_prompt():
+	prompt_file_path = os.path.join(os.path.dirname(__file__), 'prompt.txt')
+	with open(prompt_file_path, 'r') as file:
+		return file.read().strip()
+
+def get_chathistory(phone_number):
+    try:
+        msg = frappe.db.sql("""
+            SELECT message, type
+            FROM `tabWhatsApp Message`
+            WHERE `from` = %s OR `to` = %s
+        """, (phone_number, phone_number), as_dict=True)
+
+        chat_history = []
+        
+        prompt_added = False
+
+        for ele in msg:
+            if ele.type == "Incoming":
+                if not prompt_added:
+                    chat_history.append({"role": "user", "parts": get_prompt() + ele.message})
+                    prompt_added = True
+                else:
+                    chat_history.append({"role": "user", "parts": ele.message})
+            else:
+                chat_history.append({"role": "model", "parts": ele.message})
+
+        return chat_history
+
+    except Exception as e:
+        return []
+
+
+# def get_chathistory(phone_number):
+# 	try:
+# 		msg = frappe.db.sql("""
+# 			SELECT message, type
+# 			FROM `tabWhatsApp Message`
+# 			WHERE `from` = %s OR `to` = %s
+# 		""", (phone_number, phone_number), as_dict=True)
+
+# 		# Initializing chat history as an empty string
+# 		chat_history = ""
+
+# 		# Iterating over the results and appending messages to the chat history
+# 		for ele in msg:
+# 			if ele.type == "Incoming":
+# 				chat_history = chat_history+ " user: " + ele.message +"\n"
+# 			else:
+# 				chat_history = chat_history+ " assitant: " + ele.message +"\n"
+
+# 		return chat_history
+
+# 	except Exception as e:
+# 		return 
+
+def get_response_from_gpt(phone_number,message):
+	try:
+		settings = frappe.get_doc(
+				"WhatsApp Settings",
+				"WhatsApp Settings",
+			)
+		open_ai_api_key = settings.get_password("openai_api_key")
+		client = OpenAI(api_key=open_ai_api_key)
+		chat_history = get_chathistory(phone_number)
+		prompt = get_prompt()
+
+		response = client.chat.completions.create(
+			model="gpt-3.5-turbo",
+			messages=[
+				{"role": "system", "content": prompt + chat_history},
+				{"role": "user", "content": message},
+			],
+			temperature=0,
+		)
+		return response.choices[0].message.content
+	except Exception as e:
+		frappe.logger().debug({"open ai": e})
+		return "Currently unavailable. Please try again later."
+
+def get_response_from_gemini(phone_number, message):
+	try:
+		settings = frappe.get_doc(
+				"WhatsApp Settings",
+				"WhatsApp Settings",
+			)
+		genai_api_key = settings.get_password("gemini_api_key")
+		genai.configure(api_key=genai_api_key)
+		generation_config = {
+		"temperature": 0,
+		"response_mime_type": "text/plain",
+		}
+		model = genai.GenerativeModel(
+		model_name="gemini-1.5-pro-latest",
+		generation_config=generation_config,
+		)
+		chat = model.start_chat(history=get_chathistory(phone_number))
+		response = chat.send_message(message)
+		return response.text
+	except Exception as e:
+		frappe.logger().debug({"gemini": e})
+		return "Currently unavailable. Please try again later."
